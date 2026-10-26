@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JanSamvaad API Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#16232b;--muted:#5d6b73;--line:#d9e0e4;--bg:#f4f6f7;--panel:#fff;--teal:#0f5c6e;--teal-d:#0a4553;--saffron:#d9820b;--ok:#1f7a3d;--okbg:#e5f4ea;--err:#b3261e;--errbg:#fbe9e7;--code:#10202a;--codefg:#d6e4ea;--mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;--sans:'IBM Plex Sans',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--ink:#e4edf1;--muted:#93a3ac;--line:#2a3a43;--bg:#0f1a20;--panel:#16252d;--teal:#4cb5cc;--teal-d:#6fc9dd;--saffron:#f0a53a;--ok:#5fd183;--okbg:#14301f;--err:#ff8b82;--errbg:#3a1a18;--code:#0b141a}}
+*{box-sizing:border-box}html,body{margin:0}
+body{font:14px/1.5 var(--sans);color:var(--ink);background:var(--bg);padding-top:env(safe-area-inset-top,0)}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;font-weight:600}header h1 span{color:var(--saffron)}
+.cfg{display:flex;flex:1;gap:10px;min-width:260px;flex-wrap:wrap;align-items:center}
+.cfg label{font-size:12px;color:var(--muted)}
+.cfg input[type=text]{flex:1;min-width:220px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-family:var(--mono);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:6px 11px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--teal);color:#fff}
+.btn{border:1px solid var(--line);background:var(--panel);padding:6px 12px;border-radius:6px;cursor:pointer}
+.btn:hover{border-color:var(--teal)}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:500}.btn.primary:hover{background:var(--teal-d)}
+.btn:disabled{opacity:.6;cursor:wait}
+:focus-visible{outline:2px solid var(--saffron);outline-offset:2px}
+.layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 62px)}
+nav{border-right:1px solid var(--line);background:var(--panel);padding:10px 0}
+nav button{display:flex;width:100%;align-items:center;gap:8px;text-align:left;padding:9px 16px;border:0;border-left:3px solid transparent;background:none;cursor:pointer}
+nav button:hover{background:var(--bg)}nav button[aria-current=true]{background:var(--bg);border-left-color:var(--saffron);font-weight:500}
+nav .p{font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.m{font:600 10px var(--mono);background:var(--teal);color:#fff;border-radius:4px;padding:2px 5px}
+.lock{margin-left:auto;font-size:11px;color:var(--saffron)}
+nav hr{border:0;border-top:1px solid var(--line);margin:8px 0}
+main{padding:22px 26px;max-width:980px;width:100%}
+h2{margin:0 0 4px;font-size:20px}h3{margin:22px 0 8px;font-size:14px}
+.url{font:13px var(--mono);color:var(--muted);word-break:break-all}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--saffron);padding:9px 12px;border-radius:6px;margin:12px 0;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-top:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+textarea{width:100%;background:var(--code);color:var(--codefg);border:1px solid var(--line);border-radius:6px;padding:10px;font:13px/1.5 var(--mono);resize:vertical;min-height:90px}
+select,.auth input{padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.auth input{font-family:var(--mono);font-size:13px;min-width:0}
+pre{margin:0;background:var(--code);color:var(--codefg);padding:12px;border-radius:6px;overflow:auto;font:13px/1.5 var(--mono);max-height:420px}
+.tabs{display:flex;gap:4px;margin-bottom:8px}
+.tabs button{border:1px solid var(--line);background:var(--bg);padding:4px 12px;border-radius:999px;cursor:pointer;font-size:13px}
+.tabs button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tag{display:inline-block;font:500 12px var(--mono);padding:2px 8px;border-radius:999px}
+.tag.ok{background:var(--okbg);color:var(--ok)}.tag.err{background:var(--errbg);color:var(--err)}.tag.n{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+ul.msgs{margin:0;padding-left:18px}ul.msgs li{margin:2px 0;font-family:var(--mono);font-size:12.5px}
+.k{color:#8fd0e0}.s{color:#b5e0a3}.n{color:#f0c27a}
+@media(max-width:800px){.layout{grid-template-columns:1fr}nav{border-right:0;border-bottom:1px solid var(--line);display:flex;overflow-x:auto;padding:0}nav button{width:auto;white-space:nowrap;border-left:0;border-bottom:3px solid transparent}nav button[aria-current=true]{border-bottom-color:var(--saffron)}nav hr{display:none}main{padding:16px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>JanSamvaad <span>API Console</span></h1>
+  <div class="cfg">
+    <label for="base">Base URL</label>
+    <input type="text" id="base" spellcheck="false">
+    <div class="seg" role="group" aria-label="Request mode">
+      <button id="m-direct" aria-pressed="true" title="Browser calls the API directly. Needs CORS enabled on the server.">Direct</button>
+      <button id="m-proxy" aria-pressed="false" title="Goes through /api/proxy on this Vercel site.">Proxy</button>
+    </div>
+  </div>
+</header>
+<div class="layout">
+  <nav id="nav" aria-label="Endpoints"></nav>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ---------- API definition (from JanSamvaad Mobile App Documentation) ---------- */
+const COMMON = {
+  title: 'Common responses',
+  items: [
+    ['"status": "0"', 'Failure response'], ['"status": "1"', 'Success response'],
+    ['Invalid Request', 'Request method is wrong. Use POST.'],
+    ['Invalid Data', 'Check the posted JSON for required parameters.'],
+    ['token_invalid', 'Token not posted correctly. Check the bearer_token header.'],
+    ['token_expired', 'Posted token does not match the current token. Log the user out or show the login screen.']
+  ],
+  bearer: 'Protected APIs need a bearer_token header built from the Verify OTP response: {primary_id}||{access_token}. Example: primary_id 1 and access_token abcxyz gives 1||abcxyz.'
+};
+const REG = 'CMOFF/J/2026/123456', MOB = '9041062580';
+const GRV = { regno: REG, name: 'TEST TEST', district_name: '', department_name: '', subjectdetails: '1. गली से अवैध रैंप हटवाने बारे।', registration_date: '2024-01-03', current_status: 'Resolved', current_user: 'ABC ANC', grv_attachment: '', latest_atr: '' };
+const ENDPOINTS = [
+ { path:'send_otp.php', title:'Send OTP', protected:false,
+   desc:'Sends an OTP by SMS. Use type "send" for the first attempt and "resend" for a retry. send_type says which identifiers are passed: both, mobile or regno.',
+   variants:{ 'both':{send_type:'both',mobile:MOB,regno:REG,type:'send'}, 'mobile only':{send_type:'mobile',mobile:MOB,type:'send'}, 'regno only':{send_type:'regno',regno:REG,type:'send'} },
+   responses:{ success:{status:'1',message:'Request for OTP SMS successful.',send_type:'both',mobile:MOB,regno:REG}, failure:{status:'0',message:'Something went wrong. Cannot send OTP. Try again.',send_type:'both',mobile:MOB,regno:REG} },
+   successMsgs:['Request for OTP SMS successful.','Request for Resend OTP SMS successful.'],
+   failureMsgs:["Something went wrong. Can't send OTP. Try again.",'No Grievance found for provided Mobile Number','No Grievance found for provided Mobile Number and Grievance Number','No Grievance found for provided Grievance Number','you are blocked for 1 hour'] },
+ { path:'verify_otp.php', title:'Verify OTP', protected:false, capturesToken:true,
+   desc:'Verifies the OTP. On success it returns primary_id and access_token. This console saves them automatically and uses them for protected endpoints.',
+   variants:{ 'both':{send_type:'both',mobile:MOB,regno:REG,type:'send',otp:1234}, 'mobile only':{send_type:'mobile',mobile:MOB,type:'send',otp:1234}, 'regno only':{send_type:'regno',regno:REG,type:'send',otp:1234} },
+   responses:{ success:{status:'1',message:'Registered Successfully',primary_id:'7',access_token:'wlxgc0vdkp90j3oucfdn3efsx8o7jrqh5veigy3s03d0b9qgjm',data:{registration_number:REG,name:'Test (Monu)',district_name:'',department_name:'',subject_details:'1. गली से अवैध रैंप हटवाने बारे।',registration_date:'2024-01-03',current_status:'In-Process',current_user:'Revenue',grv_attachment:'',latest_atr:''}}, failure:{status:'0',message:'Invalid request method.'} },
+   failureMsgs:['Invalid request method.','Invalid request data.','Invalid JSON data.','Invalid data.','Unable to process your request.','Service temporarily unavailable.','Unable to verify OTP at this time.','Unable to verify OTP.','Unable to complete registration.','Registration could not be completed.'] },
+ { path:'fetch_grievance_list.php', title:'Fetch grievance list', protected:true,
+   desc:'Lists the grievances registered against a mobile number.',
+   variants:{ 'default':{mobile:MOB} },
+   responses:{ success:{status:'1',message:'Success',data:{0:{regno:'CMOFF/J/2026/002442',subjectdetails:'Please Enter Specific Details about Your Grievance here'},1:{regno:'CMOFF/J/2026/002450',subjectdetails:'Please Enter Specific Details about Your Grievance here'}}} } },
+ { path:'fetch_grievance_details.php', title:'Fetch grievance details', protected:true,
+   desc:'Returns the full details of one grievance.',
+   variants:{ 'regno only':{send_type:'regno',regno:REG}, 'regno + mobile':{send_type:'both',regno:REG,mobile:MOB} },
+   responses:{ success:{status:'1',message:'Success',data:GRV} } },
+ { path:'fetch_grievance_history.php', title:'Fetch grievance history', protected:true,
+   desc:'Returns the movement history of a grievance, newest first.',
+   variants:{ 'default':{regno:REG} },
+   responses:{ success:{status:'1',message:'Success',data:{0:{regno:REG,from_user:'ABC ABC',to_user:'TEST TEST',actiondate:'2024-06-27',remarks:'Dispose off'},1:{regno:REG,from_user:'ABC ABC',to_user:'TEST TEST',actiondate:'2024-05-18',remarks:'Please file the ATR for further action'}}} } },
+ { path:'take_feedback.php', title:'Take feedback', protected:true,
+   desc:'Saves the citizen\'s feedback remarks for a grievance.',
+   variants:{ 'default':{regno:REG,feedback_remarks:'this is test remarks'} },
+   responses:{ success:{status:'1',message:'Success'}, failure:{status:'0',message:'Data Not Captured.'} } }
+];
+
+/* ---------- state ---------- */
+const $ = id => document.getElementById(id);
+const store = { get:(k,d)=>{try{return localStorage.getItem(k)??d}catch{return d}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}} };
+const st = { base:store.get('base','https://10.10.100.10/mobile_api/'), mode:store.get('mode','direct'), pid:store.get('pid',''), tok:store.get('tok',''), cur:'common' };
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hl = j => esc(j).replace(/(&quot;|")([^"\n]*?)\1(\s*:)?|\b(-?\d+\.?\d*)\b/g,(m,q,t,colon,num)=> num!==undefined?`<span class="n">${m}</span>`: colon?`<span class="k">${m.slice(0,-colon.length)}</span>${colon}`:`<span class="s">${m}</span>`);
+const pretty = o => JSON.stringify(o,null,2);
+const bearer = () => st.pid && st.tok ? `${st.pid}||${st.tok}` : '';
+
+/* ---------- header controls ---------- */
+$('base').value = st.base;
+$('base').addEventListener('input',e=>{st.base=e.target.value;store.set('base',st.base);refreshUrl()});
+function setMode(m){st.mode=m;store.set('mode',m);$('m-direct').setAttribute('aria-pressed',m==='direct');$('m-proxy').setAttribute('aria-pressed',m==='proxy')}
+$('m-direct').onclick=()=>setMode('direct');$('m-proxy').onclick=()=>setMode('proxy');setMode(st.mode);
+
+/* ---------- navigation ---------- */
+function buildNav(){
+  $('nav').innerHTML = `<button data-id="common" aria-current="${st.cur==='common'}"><span>Overview</span></button><hr>` +
+    ENDPOINTS.map(e=>`<button data-id="${e.path}" aria-current="${st.cur===e.path}"><span class="m">POST</span><span class="p">${e.path}</span>${e.protected?'<span class="lock" title="Needs bearer_token">protected</span>':''}</button>`).join('');
+  $('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.cur=b.dataset.id;buildNav();render()});
+}
+const fullUrl = ep => st.base.replace(/\/?$/,'/')+ep.path;
+function refreshUrl(){const u=$('url');if(u)u.textContent=fullUrl(ENDPOINTS.find(e=>e.path===st.cur))}
+
+/* ---------- views ---------- */
+function render(){
+  if(st.cur==='common') return renderCommon();
+  const ep = ENDPOINTS.find(e=>e.path===st.cur);
+  const vKeys = Object.keys(ep.variants);
+  $('main').innerHTML = `
+    <h2>${ep.title}</h2>
+    <div class="url"><span class="m">POST</span> <span id="url">${esc(fullUrl(ep))}</span></div>
+    <p>${esc(ep.desc)}</p>
+    <div class="card">
+      <h3 style="margin-top:0">Try it</h3>
+      ${ep.protected?`<div class="note" id="authnote"></div>`:''}
+      <label for="hdrs"><b>Headers</b></label>
+      <textarea id="hdrs" rows="3" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:12px"><label for="variant"><b>Payload</b></label>
+        ${vKeys.length>1?`<select id="variant">${vKeys.map(k=>`<option>${esc(k)}</option>`).join('')}</select>`:''}</div>
+      <textarea id="body" rows="7" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="send">Send request</button><span id="meta"></span></div>
+      <pre id="out" hidden></pre>
+    </div>
+    <h3>Documented responses</h3>
+    <div class="card" style="margin-top:0">
+      <div class="tabs" id="rtabs">${Object.keys(ep.responses).map((k,i)=>`<button data-k="${k}" aria-pressed="${i===0}">${k==='success'?'Success':'Failure'}</button>`).join('')}</div>
+      <pre id="docresp"></pre>
+      ${ep.successMsgs?`<h3>Success messages</h3><ul class="msgs">${ep.successMsgs.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}
+      ${ep.failureMsgs?`<h3>Failure messages</h3><ul class="msgs">${ep.failureMsgs.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}
+    </div>`;
+  const setDoc=k=>{$('docresp').innerHTML=hl(pretty(ep.responses[k]));$('rtabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===k))};
+  $('rtabs').querySelectorAll('button').forEach(b=>b.onclick=()=>setDoc(b.dataset.k));setDoc(Object.keys(ep.responses)[0]);
+  const fillBody=()=>{$('body').value=pretty(ep.variants[$('variant')?$('variant').value:vKeys[0]])};
+  if($('variant'))$('variant').onchange=fillBody;fillBody();
+  fillHeaders(ep);$('send').onclick=()=>send(ep);
+}
+function fillHeaders(ep){
+  const h={'Content-Type':'application/json'}; if(ep.protected) h.bearer_token=bearer()||'<run Verify OTP first>';
+  $('hdrs').value=pretty(h);
+  const n=$('authnote'); if(n) n.textContent = bearer()?'bearer_token is filled from your saved login.':'No saved token yet. Run Verify OTP once, or paste primary_id||access_token in the bearer_token header below.';
+}
+function renderCommon(){
+  $('main').innerHTML = `<h2>${COMMON.title}</h2>
+    <p>Every endpoint accepts POST only and returns JSON. The staging folder is <span class="url">https://10.10.100.10/mobile_api/</span>.</p>
+    <div class="card"><ul class="msgs">${COMMON.items.map(([a,b])=>`<li><b>${esc(a)}</b>: ${esc(b)}</li>`).join('')}</ul></div>
+    <div class="note">${esc(COMMON.bearer)}</div>
+    <div class="card"><h3 style="margin-top:0">Saved login</h3>
+      <div class="row auth"><input id="pid" placeholder="primary_id" value="${esc(st.pid)}" size="10" aria-label="primary_id"><input id="tok" placeholder="access_token" value="${esc(st.tok)}" size="40" aria-label="access_token">
+      <button class="btn" id="saveAuth">Save</button><button class="btn" id="clearAuth">Clear</button></div>
+      <div class="url">bearer_token: <span id="bt">${esc(bearer()||'not set')}</span></div></div>`;
+  $('saveAuth').onclick=()=>{st.pid=$('pid').value.trim();st.tok=$('tok').value.trim();store.set('pid',st.pid);store.set('tok',st.tok);$('bt').textContent=bearer()||'not set'};
+  $('clearAuth').onclick=()=>{st.pid=st.tok='';store.set('pid','');store.set('tok','');renderCommon()};
+}
+
+/* ---------- send ---------- */
+async function send(ep){
+  const out=$('out'),meta=$('meta'),btn=$('send');
+  let headers,body;
+  try{headers=JSON.parse($('hdrs').value)}catch{return fail('Headers are not valid JSON.')}
+  try{body=JSON.stringify(JSON.parse($('body').value))}catch{return fail('Payload is not valid JSON.')}
+  function fail(m){out.hidden=false;out.textContent=m;meta.innerHTML='<span class="tag err">not sent</span>'}
+  const url=fullUrl(ep);btn.disabled=true;btn.textContent='Sending…';meta.innerHTML='';
+  const t0=performance.now();let status,text,ms;
+  try{
+    if(st.mode==='proxy'){
+      const r=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,headers,body})});
+      const j=await r.json(); if(j.error) throw new Error(j.error); status=j.status;text=j.text;ms=j.ms;
+    }else{
+      const r=await fetch(url,{method:'POST',headers,body});status=r.status;text=await r.text();ms=Math.round(performance.now()-t0);
+    }
+  }catch(e){
+    btn.disabled=false;btn.textContent='Send request';
+    return fail(`Request failed: ${e.message}\n\nDirect mode needs CORS enabled on the API and a certificate your browser trusts. Open the base URL once in a tab and accept the certificate, or switch to Proxy mode. Vercel cannot reach private addresses such as 10.x.x.x.`);
+  }
+  btn.disabled=false;btn.textContent='Send request';
+  let parsed=null;try{parsed=JSON.parse(text)}catch{}
+  const apiOk=parsed&&String(parsed.status)==='1';
+  meta.innerHTML=`<span class="tag ${status<400?'ok':'err'}">HTTP ${status}</span> `+(parsed?`<span class="tag ${apiOk?'ok':'err'}">status ${esc(parsed.status)}</span> `:'<span class="tag n">not JSON</span> ')+`<span class="tag n">${ms} ms</span>`;
+  out.hidden=false;out.innerHTML=parsed?hl(pretty(parsed)):esc(text);
+  if(ep.capturesToken&&apiOk&&parsed.primary_id&&parsed.access_token){
+    st.pid=String(parsed.primary_id);st.tok=parsed.access_token;store.set('pid',st.pid);store.set('tok',st.tok);
+    meta.innerHTML+=' <span class="tag ok">login saved</span>';
+  }
+}
+
+buildNav();render();
+</script>
+</body>
+</html>
