@@ -60,11 +60,7 @@ ul.msgs{margin:0;padding-left:18px}ul.msgs li{margin:2px 0;font-family:var(--mon
   <h1>JanSamvaad <span>API Console</span></h1>
   <div class="cfg">
     <label for="base">Base URL</label>
-    <input type="text" id="base" spellcheck="false">
-    <div class="seg" role="group" aria-label="Request mode">
-      <button id="m-direct" aria-pressed="true" title="Browser calls the API directly. Needs CORS enabled on the server.">Direct</button>
-      <button id="m-proxy" aria-pressed="false" title="Goes through /api/proxy on this Vercel site.">Proxy</button>
-    </div>
+    <input type="text" id="base" spellcheck="false" placeholder="https://api.example.com/mobile_api/">
   </div>
 </header>
 <div class="layout">
@@ -87,7 +83,7 @@ const COMMON = {
 };
 const REG = 'CMOFF/J/2026/123456', MOB = '9041062580';
 const GRV = { regno: REG, name: 'TEST TEST', district_name: '', department_name: '', subjectdetails: '1. गली से अवैध रैंप हटवाने बारे।', registration_date: '2024-01-03', current_status: 'Resolved', current_user: 'ABC ANC', grv_attachment: '', latest_atr: '' };
-const ENDPOINTS = [
+const DEFAULTS = [
  { path:'send_otp.php', title:'Send OTP', protected:false,
    desc:'Sends an OTP by SMS. Use type "send" for the first attempt and "resend" for a retry. send_type says which identifiers are passed: both, mobile or regno.',
    variants:{ 'both':{send_type:'both',mobile:MOB,regno:REG,type:'send'}, 'mobile only':{send_type:'mobile',mobile:MOB,type:'send'}, 'regno only':{send_type:'regno',regno:REG,type:'send'} },
@@ -120,104 +116,135 @@ const ENDPOINTS = [
 /* ---------- state ---------- */
 const $ = id => document.getElementById(id);
 const store = { get:(k,d)=>{try{return localStorage.getItem(k)??d}catch{return d}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}} };
-const st = { base:store.get('base','https://10.10.100.10/mobile_api/'), mode:store.get('mode','direct'), pid:store.get('pid',''), tok:store.get('tok',''), cur:'common' };
+const clone = o => JSON.parse(JSON.stringify(o));
+const uid = () => 'e'+Math.random().toString(36).slice(2,8);
+function loadEps(){ try{ const a=JSON.parse(store.get('eps','')); if(Array.isArray(a)&&a.length) return a }catch{} return clone(DEFAULTS) }
+let ENDPOINTS = loadEps();
+function normalize(){ ENDPOINTS.forEach(e=>{ e.id=e.id||uid(); if(!e.variants||!Object.keys(e.variants).length) e.variants={default:{}}; e.responses=e.responses||{}; e.responses.success=e.responses.success||{}; e.responses.failure=e.responses.failure||{}; }) }
+normalize();
+const saveEps = () => store.set('eps',JSON.stringify(ENDPOINTS));
+const st = { base:store.get('base','https://10.10.100.10/mobile_api/'), pid:store.get('pid',''), tok:store.get('tok',''), cur:'common', last:null };
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hl = j => esc(j).replace(/(&quot;|")([^"\n]*?)\1(\s*:)?|\b(-?\d+\.?\d*)\b/g,(m,q,t,colon,num)=> num!==undefined?`<span class="n">${m}</span>`: colon?`<span class="k">${m.slice(0,-colon.length)}</span>${colon}`:`<span class="s">${m}</span>`);
 const pretty = o => JSON.stringify(o,null,2);
 const bearer = () => st.pid && st.tok ? `${st.pid}||${st.tok}` : '';
+const curEp = () => ENDPOINTS.find(e=>e.id===st.cur);
+const fullUrl = ep => /^https?:\/\//i.test(ep.path||'') ? ep.path : st.base.replace(/\/+$/,'')+'/'+(ep.path||'').replace(/^\/+/,'');
+function refreshUrl(){const u=$('url'),ep=curEp();if(u&&ep)u.textContent=fullUrl(ep)}
 
-/* ---------- header controls ---------- */
 $('base').value = st.base;
-$('base').addEventListener('input',e=>{st.base=e.target.value;store.set('base',st.base);refreshUrl()});
-function setMode(m){st.mode=m;store.set('mode',m);$('m-direct').setAttribute('aria-pressed',m==='direct');$('m-proxy').setAttribute('aria-pressed',m==='proxy')}
-$('m-direct').onclick=()=>setMode('direct');$('m-proxy').onclick=()=>setMode('proxy');setMode(st.mode);
+$('base').addEventListener('input',e=>{st.base=e.target.value.trim();store.set('base',st.base);refreshUrl()});
 
 /* ---------- navigation ---------- */
 function buildNav(){
   $('nav').innerHTML = `<button data-id="common" aria-current="${st.cur==='common'}"><span>Overview</span></button><hr>` +
-    ENDPOINTS.map(e=>`<button data-id="${e.path}" aria-current="${st.cur===e.path}"><span class="m">POST</span><span class="p">${e.path}</span>${e.protected?'<span class="lock" title="Needs bearer_token">protected</span>':''}</button>`).join('');
-  $('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.cur=b.dataset.id;buildNav();render()});
+    ENDPOINTS.map(e=>`<button data-id="${e.id}" aria-current="${st.cur===e.id}"><span class="m">POST</span><span class="p">${esc(e.path||'(no path)')}</span>${e.protected?'<span class="lock" title="Sends bearer_token">protected</span>':''}</button>`).join('') +
+    `<hr><button id="addEp"><span class="p">+ Add endpoint</span></button>`;
+  $('nav').querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>{st.cur=b.dataset.id;buildNav();render()});
+  $('addEp').onclick=()=>{const e={id:uid(),path:'new_endpoint.php',title:'New endpoint',protected:false,desc:'',variants:{default:{}},responses:{success:{},failure:{}}};ENDPOINTS.push(e);saveEps();st.cur=e.id;buildNav();render();$('path').select()};
 }
-const fullUrl = ep => st.base.replace(/\/?$/,'/')+ep.path;
-function refreshUrl(){const u=$('url');if(u)u.textContent=fullUrl(ENDPOINTS.find(e=>e.path===st.cur))}
 
-/* ---------- views ---------- */
+/* ---------- endpoint view ---------- */
 function render(){
   if(st.cur==='common') return renderCommon();
-  const ep = ENDPOINTS.find(e=>e.path===st.cur);
-  const vKeys = Object.keys(ep.variants);
+  const ep=curEp(); if(!ep){st.cur='common';buildNav();return renderCommon()}
+  st.last=null;
   $('main').innerHTML = `
-    <h2>${ep.title}</h2>
-    <div class="url"><span class="m">POST</span> <span id="url">${esc(fullUrl(ep))}</span></div>
-    <p>${esc(ep.desc)}</p>
+    <div class="auth"><input id="title" value="${esc(ep.title||'')}" placeholder="Endpoint name" aria-label="Endpoint name" style="width:100%;font-size:20px;font-weight:600;border-color:transparent;background:transparent"></div>
+    <div class="row auth" style="margin-top:6px"><span class="m">POST</span><input id="path" value="${esc(ep.path||'')}" placeholder="send_otp.php" size="30" aria-label="Endpoint path">
+      <label><input type="checkbox" id="prot" ${ep.protected?'checked':''}> Protected (sends bearer_token)</label><button class="btn" id="del">Remove endpoint</button></div>
+    <div class="url" id="url"></div>
+    <div class="auth" style="margin-top:8px"><input id="desc" value="${esc(ep.desc||'')}" placeholder="What does this endpoint do?" aria-label="Description" style="width:100%"></div>
     <div class="card">
       <h3 style="margin-top:0">Try it</h3>
       ${ep.protected?`<div class="note" id="authnote"></div>`:''}
       <label for="hdrs"><b>Headers</b></label>
       <textarea id="hdrs" rows="3" spellcheck="false"></textarea>
-      <div class="row" style="margin-top:12px"><label for="variant"><b>Payload</b></label>
-        ${vKeys.length>1?`<select id="variant">${vKeys.map(k=>`<option>${esc(k)}</option>`).join('')}</select>`:''}</div>
+      <div class="row" style="margin-top:12px"><label for="variant"><b>Payload</b></label><select id="variant"></select>
+        <button class="btn" id="saveVar">Save as example</button><button class="btn" id="delVar">Delete example</button></div>
       <textarea id="body" rows="7" spellcheck="false"></textarea>
       <div class="row" style="margin-top:10px"><button class="btn primary" id="send">Send request</button><span id="meta"></span></div>
       <pre id="out" hidden></pre>
     </div>
     <h3>Documented responses</h3>
     <div class="card" style="margin-top:0">
-      <div class="tabs" id="rtabs">${Object.keys(ep.responses).map((k,i)=>`<button data-k="${k}" aria-pressed="${i===0}">${k==='success'?'Success':'Failure'}</button>`).join('')}</div>
-      <pre id="docresp"></pre>
+      <div class="tabs" id="rtabs"><button data-k="success" aria-pressed="true">Success</button><button data-k="failure" aria-pressed="false">Failure</button></div>
+      <textarea id="docresp" rows="8" spellcheck="false" aria-label="Documented response JSON"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn" id="useLast" hidden></button><span class="url" id="docmsg"></span></div>
       ${ep.successMsgs?`<h3>Success messages</h3><ul class="msgs">${ep.successMsgs.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}
       ${ep.failureMsgs?`<h3>Failure messages</h3><ul class="msgs">${ep.failureMsgs.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}
     </div>`;
-  const setDoc=k=>{$('docresp').innerHTML=hl(pretty(ep.responses[k]));$('rtabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===k))};
-  $('rtabs').querySelectorAll('button').forEach(b=>b.onclick=()=>setDoc(b.dataset.k));setDoc(Object.keys(ep.responses)[0]);
-  const fillBody=()=>{$('body').value=pretty(ep.variants[$('variant')?$('variant').value:vKeys[0]])};
-  if($('variant'))$('variant').onchange=fillBody;fillBody();
-  fillHeaders(ep);$('send').onclick=()=>send(ep);
+  refreshUrl();
+  const upd=()=>{saveEps();buildNav();refreshUrl()};
+  $('title').oninput=e=>{ep.title=e.target.value;saveEps()};
+  $('path').oninput=e=>{ep.path=e.target.value.trim();upd()};
+  $('prot').onchange=e=>{ep.protected=e.target.checked;saveEps();buildNav();render()};
+  $('desc').oninput=e=>{ep.desc=e.target.value;saveEps()};
+  $('del').onclick=()=>{if(!confirm('Remove this endpoint?'))return;ENDPOINTS=ENDPOINTS.filter(x=>x!==ep);saveEps();st.cur='common';buildNav();render()};
+  /* payload examples */
+  const sel=$('variant');
+  const fillBody=()=>{$('body').value=pretty(ep.variants[sel.value]||{})};
+  const fillSel=name=>{sel.innerHTML=Object.keys(ep.variants).map(k=>`<option>${esc(k)}</option>`).join('');if(name)sel.value=name;fillBody()};
+  sel.onchange=fillBody;fillSel();
+  $('saveVar').onclick=()=>{const name=prompt('Example name',sel.value);if(!name)return;let o;try{o=JSON.parse($('body').value)}catch{return alert('Payload is not valid JSON.')}ep.variants[name]=o;saveEps();fillSel(name)};
+  $('delVar').onclick=()=>{if(Object.keys(ep.variants).length<2)return alert('Keep at least one example.');delete ep.variants[sel.value];saveEps();fillSel()};
+  /* documented responses */
+  let tab='success';
+  const showDoc=()=>{$('docresp').value=pretty(ep.responses[tab]);$('rtabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===tab));$('useLast').textContent=`Save last live response as ${tab}`;$('docmsg').textContent=''};
+  $('rtabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{tab=b.dataset.k;showDoc()});
+  $('docresp').oninput=e=>{try{ep.responses[tab]=JSON.parse(e.target.value);saveEps();$('docmsg').textContent='Saved'}catch{$('docmsg').textContent='Not valid JSON yet, not saved'}};
+  $('useLast').onclick=()=>{if(!st.last)return;ep.responses[tab]=st.last;saveEps();showDoc();$('docmsg').textContent='Saved'};
+  showDoc();fillHeaders(ep);$('send').onclick=()=>send(ep);
 }
 function fillHeaders(ep){
   const h={'Content-Type':'application/json'}; if(ep.protected) h.bearer_token=bearer()||'<run Verify OTP first>';
   $('hdrs').value=pretty(h);
-  const n=$('authnote'); if(n) n.textContent = bearer()?'bearer_token is filled from your saved login.':'No saved token yet. Run Verify OTP once, or paste primary_id||access_token in the bearer_token header below.';
+  const n=$('authnote'); if(n) n.textContent = bearer()?'bearer_token is filled from your saved login.':'No saved token yet. Call the Verify OTP endpoint once, or save a token on the Overview page.';
 }
+
+/* ---------- overview ---------- */
 function renderCommon(){
   $('main').innerHTML = `<h2>${COMMON.title}</h2>
-    <p>Every endpoint accepts POST only and returns JSON. The staging folder is <span class="url">https://10.10.100.10/mobile_api/</span>.</p>
+    <p>Set the base URL at the top, then edit, add or remove endpoints from the sidebar. Every request is sent as POST with JSON.</p>
     <div class="card"><ul class="msgs">${COMMON.items.map(([a,b])=>`<li><b>${esc(a)}</b>: ${esc(b)}</li>`).join('')}</ul></div>
     <div class="note">${esc(COMMON.bearer)}</div>
     <div class="card"><h3 style="margin-top:0">Saved login</h3>
       <div class="row auth"><input id="pid" placeholder="primary_id" value="${esc(st.pid)}" size="10" aria-label="primary_id"><input id="tok" placeholder="access_token" value="${esc(st.tok)}" size="40" aria-label="access_token">
       <button class="btn" id="saveAuth">Save</button><button class="btn" id="clearAuth">Clear</button></div>
-      <div class="url">bearer_token: <span id="bt">${esc(bearer()||'not set')}</span></div></div>`;
+      <div class="url">bearer_token: <span id="bt">${esc(bearer()||'not set')}</span></div></div>
+    <div class="card"><h3 style="margin-top:0">Endpoints data</h3>
+      <p style="margin-top:0;color:var(--muted)">Endpoints are saved in this browser. Export them to share with a teammate or move to another browser.</p>
+      <div class="row"><button class="btn" id="exp">Export JSON</button><button class="btn" id="impBtn">Import JSON</button><input type="file" id="imp" accept=".json,application/json" hidden><button class="btn" id="reset">Reset to the 6 JanSamvaad endpoints</button></div></div>`;
   $('saveAuth').onclick=()=>{st.pid=$('pid').value.trim();st.tok=$('tok').value.trim();store.set('pid',st.pid);store.set('tok',st.tok);$('bt').textContent=bearer()||'not set'};
   $('clearAuth').onclick=()=>{st.pid=st.tok='';store.set('pid','');store.set('tok','');renderCommon()};
+  $('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([pretty(ENDPOINTS)],{type:'application/json'}));a.download='endpoints.json';a.click()};
+  $('impBtn').onclick=()=>$('imp').click();
+  $('imp').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const a=JSON.parse(await f.text());if(!Array.isArray(a)||!a.length)throw 0;ENDPOINTS=a;normalize();saveEps();buildNav();renderCommon()}catch{alert('That file is not a valid endpoints JSON.')}};
+  $('reset').onclick=()=>{if(!confirm('Replace all endpoints with the 6 defaults?'))return;ENDPOINTS=clone(DEFAULTS);normalize();saveEps();buildNav();renderCommon()};
 }
 
 /* ---------- send ---------- */
 async function send(ep){
   const out=$('out'),meta=$('meta'),btn=$('send');
   let headers,body;
+  const fail=m=>{out.hidden=false;out.textContent=m;meta.innerHTML='<span class="tag err">not sent</span>'};
   try{headers=JSON.parse($('hdrs').value)}catch{return fail('Headers are not valid JSON.')}
   try{body=JSON.stringify(JSON.parse($('body').value))}catch{return fail('Payload is not valid JSON.')}
-  function fail(m){out.hidden=false;out.textContent=m;meta.innerHTML='<span class="tag err">not sent</span>'}
+  if(!st.base&&!/^https?:\/\//i.test(ep.path||''))return fail('Enter a base URL at the top first.');
   const url=fullUrl(ep);btn.disabled=true;btn.textContent='Sending…';meta.innerHTML='';
-  const t0=performance.now();let status,text,ms;
-  try{
-    if(st.mode==='proxy'){
-      const r=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,headers,body})});
-      const j=await r.json(); if(j.error) throw new Error(j.error); status=j.status;text=j.text;ms=j.ms;
-    }else{
-      const r=await fetch(url,{method:'POST',headers,body});status=r.status;text=await r.text();ms=Math.round(performance.now()-t0);
-    }
-  }catch(e){
+  const t0=performance.now();let status,text;
+  try{const r=await fetch(url,{method:'POST',headers,body});status=r.status;text=await r.text()}
+  catch(e){
     btn.disabled=false;btn.textContent='Send request';
-    return fail(`Request failed: ${e.message}\n\nDirect mode needs CORS enabled on the API and a certificate your browser trusts. Open the base URL once in a tab and accept the certificate, or switch to Proxy mode. Vercel cannot reach private addresses such as 10.x.x.x.`);
+    return fail(`Request failed: ${e.message}\n\nCommon causes:\n- The server does not allow cross-origin requests (CORS). It must allow this site's origin and the headers you send, such as bearer_token.\n- The base URL starts with http:// but this site is https://. Browsers block that. Use an https:// API.\n- The certificate is not trusted. Open the base URL in a new tab and accept it.\n- The address is private (10.x.x.x) and your device is not on that network.`);
   }
-  btn.disabled=false;btn.textContent='Send request';
+  const ms=Math.round(performance.now()-t0);btn.disabled=false;btn.textContent='Send request';
   let parsed=null;try{parsed=JSON.parse(text)}catch{}
   const apiOk=parsed&&String(parsed.status)==='1';
   meta.innerHTML=`<span class="tag ${status<400?'ok':'err'}">HTTP ${status}</span> `+(parsed?`<span class="tag ${apiOk?'ok':'err'}">status ${esc(parsed.status)}</span> `:'<span class="tag n">not JSON</span> ')+`<span class="tag n">${ms} ms</span>`;
   out.hidden=false;out.innerHTML=parsed?hl(pretty(parsed)):esc(text);
-  if(ep.capturesToken&&apiOk&&parsed.primary_id&&parsed.access_token){
+  if(parsed&&typeof parsed==='object'){st.last=parsed;$('useLast').hidden=false}
+  if(apiOk&&parsed.primary_id&&parsed.access_token){
     st.pid=String(parsed.primary_id);st.tok=parsed.access_token;store.set('pid',st.pid);store.set('tok',st.tok);
     meta.innerHTML+=' <span class="tag ok">login saved</span>';
   }
