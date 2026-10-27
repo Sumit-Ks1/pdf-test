@@ -245,7 +245,8 @@ async function send(ep){
     try{
       const r=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,headers,body})});
       const p=await r.json().catch(()=>({error:`Proxy returned HTTP ${r.status}. Is this page deployed on Vercel with api/proxy.js?`}));
-      if(p.error)throw new Error(p.error);
+      /* A Vercel platform error ({error:{code,message,id}}) means Vercel blocked the call to /api/proxy itself. */
+      if(p.error)throw new Error(typeof p.error==='string'?p.error:`Vercel blocked the call to this site's /api/proxy (HTTP ${r.status}):\n${pretty(p.error)}\n\nCheck this project's Settings > Deployment Protection and Firewall.`);
       status=p.status;text=p.text;
     }catch(e){
       btn.disabled=false;btn.textContent='Send request';
@@ -260,7 +261,7 @@ async function send(ep){
   const ms=Math.round(performance.now()-t0);btn.disabled=false;btn.textContent='Send request';
   let parsed=null;try{parsed=JSON.parse(text)}catch{}
   const apiOk=parsed&&String(parsed.status)==='1';
-  meta.innerHTML=`<span class="tag ${status<400?'ok':'err'}">HTTP ${status}</span> `+(parsed?`<span class="tag ${apiOk?'ok':'err'}">status ${esc(parsed.status)}</span> `:'<span class="tag n">not JSON</span> ')+`<span class="tag n">${ms} ms</span>`;
+  meta.innerHTML=`<span class="tag ${status<400?'ok':'err'}">HTTP ${status}</span> <span class="tag n">${st.via}</span> `+(parsed?`<span class="tag ${apiOk?'ok':'err'}">status ${esc(parsed.status)}</span> `:'<span class="tag n">not JSON</span> ')+`<span class="tag n">${ms} ms</span>`;
   out.hidden=false;out.innerHTML=parsed?hl(pretty(parsed)):esc(text);
   if(parsed&&typeof parsed==='object'){st.last=parsed;$('useLast').hidden=false}
   if(apiOk&&parsed.primary_id&&parsed.access_token){
