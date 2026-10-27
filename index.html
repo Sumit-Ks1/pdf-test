@@ -61,6 +61,8 @@ ul.msgs{margin:0;padding-left:18px}ul.msgs li{margin:2px 0;font-family:var(--mon
   <div class="cfg">
     <label for="base">Base URL</label>
     <input type="text" id="base" spellcheck="false" placeholder="https://api.example.com/mobile_api/">
+    <label id="viaLbl">Send via</label>
+    <div class="seg" id="via" role="group" aria-labelledby="viaLbl"><button data-v="proxy" title="Server-side request through /api/proxy. No CORS limits.">Proxy</button><button data-v="direct" title="Browser calls the API directly. The API must allow CORS.">Direct</button></div>
   </div>
 </header>
 <div class="layout">
@@ -134,6 +136,12 @@ function refreshUrl(){const u=$('url'),ep=curEp();if(u&&ep)u.textContent=fullUrl
 
 $('base').value = st.base;
 $('base').addEventListener('input',e=>{st.base=e.target.value.trim();store.set('base',st.base);refreshUrl()});
+/* The proxy only exists when this page is served by Vercel, not when opened as a local file. */
+const canProxy = /^https?:$/.test(location.protocol);
+st.via = canProxy ? store.get('via','proxy') : 'direct';
+function paintVia(){$('via').querySelectorAll('button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.v===st.via);b.disabled=!canProxy&&b.dataset.v==='proxy'})}
+$('via').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.via=b.dataset.v;store.set('via',st.via);paintVia()});
+paintVia();
 
 /* ---------- navigation ---------- */
 function buildNav(){
@@ -233,10 +241,21 @@ async function send(ep){
   if(!st.base&&!/^https?:\/\//i.test(ep.path||''))return fail('Enter a base URL at the top first.');
   const url=fullUrl(ep);btn.disabled=true;btn.textContent='Sending…';meta.innerHTML='';
   const t0=performance.now();let status,text;
-  try{const r=await fetch(url,{method:'POST',headers,body});status=r.status;text=await r.text()}
+  if(st.via==='proxy'){
+    try{
+      const r=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,headers,body})});
+      const p=await r.json().catch(()=>({error:`Proxy returned HTTP ${r.status}. Is this page deployed on Vercel with api/proxy.js?`}));
+      if(p.error)throw new Error(p.error);
+      status=p.status;text=p.text;
+    }catch(e){
+      btn.disabled=false;btn.textContent='Send request';
+      return fail(`Proxy request failed: ${e.message}`);
+    }
+  }
+  else try{const r=await fetch(url,{method:'POST',headers,body});status=r.status;text=await r.text()}
   catch(e){
     btn.disabled=false;btn.textContent='Send request';
-    return fail(`Request failed: ${e.message}\n\nCommon causes:\n- The server does not allow cross-origin requests (CORS). It must allow this site's origin and the headers you send, such as bearer_token.\n- The base URL starts with http:// but this site is https://. Browsers block that. Use an https:// API.\n- The certificate is not trusted. Open the base URL in a new tab and accept it.\n- The address is private (10.x.x.x) and your device is not on that network.`);
+    return fail(`Request failed: ${e.message}\n\nSwitch "Send via" to Proxy to avoid browser CORS limits.\n\nCommon causes:\n- The server does not allow cross-origin requests (CORS). It must allow this site's origin and the headers you send, such as bearer_token.\n- The base URL starts with http:// but this site is https://. Browsers block that. Use an https:// API.\n- The certificate is not trusted. Open the base URL in a new tab and accept it.\n- The address is private (10.x.x.x) and your device is not on that network.`);
   }
   const ms=Math.round(performance.now()-t0);btn.disabled=false;btn.textContent='Send request';
   let parsed=null;try{parsed=JSON.parse(text)}catch{}
